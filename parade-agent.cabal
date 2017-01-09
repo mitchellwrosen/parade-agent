@@ -17,6 +17,10 @@ library
       base
     , vector
     , unordered-containers
+    , containers
+    , free
+  exposed-modules:
+      Parade
   default-language: Haskell2010
 
 test-suite doctest
@@ -30,6 +34,8 @@ test-suite doctest
       base
     , vector
     , unordered-containers
+    , containers
+    , free
     , parade-agent
     , doctest
   other-modules:
@@ -47,6 +53,8 @@ test-suite spec
       base
     , vector
     , unordered-containers
+    , containers
+    , free
     , parade-agent
     , hspec
   other-modules:

@@ -13,6 +13,8 @@ dependencies:
   - base
   - vector
   - unordered-containers
+  - containers
+  - free
 
 library:
   source-dirs: src
