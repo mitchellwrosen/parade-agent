@@ -1,4 +1,4 @@
--- This file has been generated from package.yaml by hpack version 0.14.0.
+-- This file has been generated from package.yaml by hpack version 0.15.0.
 --
 -- see: https://github.com/sol/hpack
 
@@ -11,16 +11,23 @@ cabal-version:  >= 1.10
 library
   hs-source-dirs:
       src
-  default-extensions: BangPatterns LambdaCase OverloadedStrings ViewPatterns
+  default-extensions: BangPatterns DeriveFunctor FlexibleInstances FunctionalDependencies LambdaCase MultiParamTypeClasses OverloadedStrings RankNTypes TypeSynonymInstances ViewPatterns
   ghc-options: -Wall
   build-depends:
       base
-    , vector
-    , unordered-containers
     , containers
     , free
+    , microlens
+    , microlens-th
+    , template-haskell
+    , unordered-containers
+    , vector
   exposed-modules:
-      Parade
+      Card
+      Deck
+      Game
+      LensTH
+      Monad
   default-language: Haskell2010
 
 test-suite doctest
@@ -28,14 +35,17 @@ test-suite doctest
   main-is: DocTest.hs
   hs-source-dirs:
       test
-  default-extensions: BangPatterns LambdaCase OverloadedStrings ViewPatterns
+  default-extensions: BangPatterns DeriveFunctor FlexibleInstances FunctionalDependencies LambdaCase MultiParamTypeClasses OverloadedStrings RankNTypes TypeSynonymInstances ViewPatterns
   ghc-options: -Wall
   build-depends:
       base
-    , vector
-    , unordered-containers
     , containers
     , free
+    , microlens
+    , microlens-th
+    , template-haskell
+    , unordered-containers
+    , vector
     , parade-agent
     , doctest
   other-modules:
@@ -47,14 +57,17 @@ test-suite spec
   main-is: Spec.hs
   hs-source-dirs:
       test
-  default-extensions: BangPatterns LambdaCase OverloadedStrings ViewPatterns
+  default-extensions: BangPatterns DeriveFunctor FlexibleInstances FunctionalDependencies LambdaCase MultiParamTypeClasses OverloadedStrings RankNTypes TypeSynonymInstances ViewPatterns
   ghc-options: -Wall
   build-depends:
       base
-    , vector
-    , unordered-containers
     , containers
     , free
+    , microlens
+    , microlens-th
+    , template-haskell
+    , unordered-containers
+    , vector
     , parade-agent
     , hspec
   other-modules:

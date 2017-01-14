@@ -1,56 +1,43 @@
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE DeriveFunctor #-}
-module Parade where
 
-import Control.Monad.Trans.Free
-import Data.Map (Map)
+module Monad where
 
-data Card = Card Color Int
-  deriving (Eq, Ord, Show)
+import Card
+import Game
 
-data Color
-  = Red
-  | Green
-  | Blue
-  | Purple
-  | Yellow
-  | Black
-  deriving (Eq, Ord, Show)
+import Control.Monad.Trans.Free (FreeT, liftF)
 
-type Parade = [Card]
-type Deck = [Card]
-type Hand = [Card]
-
-type Tableau = Map Color Int
-
-data GameMasterState =
-  GameMasterState Int [(Hand, Tableau)] Parade Deck
-  deriving (Eq, Ord, Show)
-
-data GameState =
-  GameState Hand Tableau [Tableau] Parade Int
-  deriving (Eq, Ord, Show)
-
+-- | The result of making a play from the perspective of a single player.
 data PlayResult
   = Round GameState
+  -- ^ The round continued as normal.
   | FinalRound GameState
+  -- ^ Your or another player triggered the final round condition on or after
+  -- your previous move; the next (legal) move you make on the given game state
+  -- will be your last.
   | GameOver Int [Int]
+  -- ^ The game is over.
 
+{-
+-- | The result of making a play.
 data MasterPlayResult
   = MasterRound GameMasterState
   | MasterFinalRound GameMasterState
   | MasterGameOver [Int]
+-}
 
+
+-- | The underlying player action functor.
 data Action x
   = Play Card (PlayResult -> x)
+  -- ^ Play a card.
   deriving (Functor)
 
-type Player m a = GameState -> FreeT Action m a
-
+-- | Play smart constructor
 play :: Monad m => Card -> FreeT Action m PlayResult
 play c = liftF (Play c id)
 
+{-
 dummyAI :: Monad m => Player m (Int, [Int])
 dummyAI (GameState (x:xs) _ _ _ _) = do
   res <- play x
@@ -102,4 +89,4 @@ runParade p = go start (p $ toPlayerState start)
           -- draw cards for the hand
           -- add to parade
           -- what from the old parade gets added to tableau
-
+-}
