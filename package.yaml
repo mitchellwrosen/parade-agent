@@ -19,8 +19,7 @@ dependencies:
   - base
   - containers
   - free
-  - microlens
-  - microlens-th
+  - microlens-platform
   - template-haskell
   - unordered-containers
   - vector

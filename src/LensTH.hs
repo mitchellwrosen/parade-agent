@@ -4,8 +4,7 @@ module LensTH
 
 import Data.Char (toUpper)
 import Language.Haskell.TH
-import Lens.Micro
-import Lens.Micro.TH
+import Lens.Micro.Platform
 
 -- | Generate classy fields with an L suffix, e.g.
 --

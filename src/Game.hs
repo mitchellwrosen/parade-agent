@@ -8,29 +8,30 @@ module Game
   , Parade
   , RankSet
   , Tableau
-  , Player
-  , GameState
-  , GameMasterState
-  , StepResult
+  , Player(..)
+  , GameState(..)
+  , GameMasterState(..)
+  , StepResult(..)
   , stepParade
   ) where
 
 import Card
 import Deck
 import LensTH
+import Tableau
 
-import Data.IntSet (IntSet)
-import Data.Map (Map)
-import Lens.Micro
-import Lens.Micro.TH
+import Data.List (delete)
+import Data.Maybe (isJust)
+import Data.Monoid
+import Data.Sequence (Seq, (<|))
+import Data.Set (Set)
+import Lens.Micro.Platform
+
+import qualified Data.Set as Set
 
 type Hand = [Card]
 
-type Parade = [Card]
-
-type RankSet = IntSet
-
-type Tableau = Map Color RankSet
+type Parade = Seq Card
 
 type PlayerIx = Int
 
@@ -51,23 +52,36 @@ data GameState = GameState
 makeLensesWith elSuffixFields ''GameState
 
 data GameMasterState = GameMasterState
-  { playerIx :: PlayerIx
-  , players  :: [Player]
-  , parade   :: Parade
-  , deck     :: Deck
-  , lastTurn :: Maybe PlayerIx
+  { playerIx   :: PlayerIx
+  , players    :: [Player]
+  , numPlayers :: !Int
+  , parade     :: Parade
+  , deck       :: Deck
+  , lastTurn   :: Maybe PlayerIx
   -- ^ The index of the player who gets to make the last play before the game
   -- ends. 'Nothing' initially, and set to 'Just' when a final-round condition
   -- is met.
   } deriving (Eq, Ord, Show)
 makeLensesWith elSuffixFields ''GameMasterState
 
--- | Lens on the current player of a 'GameMasterState'
-curPlayerL :: Lens' GameMasterState Player
-curPlayerL =
+-- | Lens on the player at a specific index.
+playerAtL :: PlayerIx -> Lens' GameMasterState Player
+playerAtL n =
   lens
-    (\s -> players s !! playerIx s)
-    (\s p -> s & playersL . ix (playerIx s) .~ p)
+    (\s -> players s !! n)
+    (\s p -> s & playersL . ix n .~ p)
+
+-- | Lens on the current player.
+curPlayerL :: Lens' GameMasterState Player
+curPlayerL f s = playerAtL (playerIx s) f s
+
+-- | If a move is made, would it be the last?
+isLastMove :: GameMasterState -> Bool
+isLastMove state = lastTurn state == Just (playerIx state)
+
+-- | Has the game already entered the final round?
+isFinalRound :: GameMasterState -> Bool
+isFinalRound = isJust . lastTurn
 
 data StepResult
   = InvalidMove
@@ -84,29 +98,82 @@ stepParade card state
   | not (elem card (state ^. curPlayerL . handL)) = InvalidMove
   | otherwise = stepParade' card state
 
+-- Precondition: play is valid.
 stepParade' :: Card -> GameMasterState -> StepResult
-stepParade' card state = undefined
+stepParade' card state
+  | isLastMove   state    = GameOver   newState
+  | isFinalRound newState = FinalRound newState
+  | otherwise             = Round      newState
  where
   newState :: GameMasterState
   newState = state
-    { playerIx = newPlayerIx
-    , players  = newPlayers
-    , parade   = newParade
-    , deck     = newDeck
-    , lastTurn = newLastTurn
-    }
+    & playerIxL  %~ updatePlayerIx
+    & curPlayerL %~ updateCurPlayer -- Updates playersL
+    & paradeL    .~ newParade
+    & deckL      %~ updateDeck
+    & lastTurnL  %~ updateLastTurn
 
-  newPlayerIx :: PlayerIx
-  newPlayerIx = undefined
+  -- Unless this is the last player to move, the player index just gets bumped.
+  updatePlayerIx :: PlayerIx -> PlayerIx
+  updatePlayerIx n
+    | isLastMove state = n
+    | otherwise        = (n+1) `mod` numPlayers state
 
-  newPlayers :: [Player]
-  newPlayers = undefined
+  updateCurPlayer :: Player -> Player
+  updateCurPlayer player = player
+    -- Delete the played card from the player's hand
+    & handL %~ delete card
+    -- Draw the top card of the deck (if any)
+    & handL %~ drawCard
+    -- Insert into the tableau all of the cards attracted from the parade
+    & tableauL %~ insertAttractedCards
+   where
+    drawCard :: Hand -> Hand
+    drawCard =
+      case deck state of
+        []    -> id
+        (c:_) -> (c:)
 
+    -- Insert all of the attracted cards into the tableau.
+    insertAttractedCards :: Tableau -> Tableau
+    insertAttractedCards =
+      appEndo (foldMap (Endo . insertTableau) attractedCards)
+
+  -- To calculate the new parade, walk over it, binning each card into either
+  -- the new parade, or a set of cards to be removed from the parade and added
+  -- to the current player's tableau.
   newParade :: Parade
-  newParade = undefined
+  attractedCards :: Set Card
+  (newParade, attractedCards) = foldr step (pure card, mempty) (parade' state)
+   where
+    step :: Card -> (Parade, Set Card) -> (Parade, Set Card)
+    step c (p, cs)
+      | card `attracts` c = (p, Set.insert c cs)
+      | otherwise = (c <| p, cs)
 
-  newDeck :: Deck
-  newDeck = undefined
+    -- Wow DuplicateRecordFields... fail.
+    parade' :: GameMasterState -> Parade
+    parade' = parade
 
-  newLastTurn :: Maybe PlayerIx
-  newLastTurn = undefined
+  updateDeck :: Deck -> Deck
+  updateDeck = safeTail
+
+  updateLastTurn :: Maybe PlayerIx -> Maybe PlayerIx
+  updateLastTurn (Just n) = Just n
+  updateLastTurn Nothing
+    | cond1 || cond2 = Just (playerIx state)
+    | otherwise = Nothing
+   where
+    -- Final round condition 1: deck was just exhausted
+    cond1 :: Bool
+    cond1 = null (deck newState)
+
+    -- Final round condition 2: current player's tableau has a card of every
+    -- color. Can't use 'curPlayerL' lens here, since the new state's index has
+    -- already been updated.
+    cond2 :: Bool
+    cond2 = length (newState ^. playerAtL (playerIx state) . tableauL) == 6
+
+safeTail :: [a] -> [a]
+safeTail [] = []
+safeTail (_:xs) = xs
