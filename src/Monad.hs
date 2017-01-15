@@ -9,9 +9,9 @@ import Control.Monad.Trans.Free (FreeT, liftF)
 
 -- | The result of making a play from the perspective of a single player.
 data PlayResult
-  = Round GameState
+  = Round PlayerView
   -- ^ The round continued as normal.
-  | FinalRound GameState
+  | FinalRound PlayerView
   -- ^ Your or another player triggered the final round condition on or after
   -- your previous move; the next (legal) move you make on the given game state
   -- will be your last.

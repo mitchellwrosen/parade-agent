@@ -4,15 +4,19 @@
 -- | Parade game types and game logic.
 
 module Game
-  ( Hand
+  ( -- * Parade game state
+    GameState(..)
+  , PlayerView(..)
+  , toPlayerView
+  , curPlayerView
+  , StepResult(..)
+  , stepParade
+    -- * Misc. types
+  , Hand
   , Parade
   , RankSet
   , Tableau
   , Player(..)
-  , GameState(..)
-  , GameMasterState(..)
-  , StepResult(..)
-  , stepParade
   ) where
 
 import Card
@@ -41,17 +45,7 @@ data Player = Player
   } deriving (Eq, Ord, Show)
 makeLensesWith elSuffixFields ''Player
 
--- | The game state from the perspective of a single player.
 data GameState = GameState
-  { hand      :: Hand
-  , tableau   :: Tableau
-  , parade    :: Parade
-  , opponents :: [Tableau] -- TODO: Include num cards in hand?
-  , deckSize  :: Int
-  } deriving (Eq, Ord, Show)
-makeLensesWith elSuffixFields ''GameState
-
-data GameMasterState = GameMasterState
   { playerIx   :: PlayerIx
   , players    :: [Player]
   , numPlayers :: !Int
@@ -62,77 +56,88 @@ data GameMasterState = GameMasterState
   -- ends. 'Nothing' initially, and set to 'Just' when a final-round condition
   -- is met.
   } deriving (Eq, Ord, Show)
-makeLensesWith elSuffixFields ''GameMasterState
+makeLensesWith elSuffixFields ''GameState
 
 -- | Lens on the player at a specific index.
-playerAtL :: PlayerIx -> Lens' GameMasterState Player
+playerAtL :: PlayerIx -> Lens' GameState Player
 playerAtL n =
   lens
     (\s -> players s !! n)
     (\s p -> s & playersL . ix n .~ p)
 
-curPlayer :: GameMasterState -> Player
+curPlayer :: GameState -> Player
 curPlayer = view curPlayerL
 
 -- | Lens on the current player.
-curPlayerL :: Lens' GameMasterState Player
+curPlayerL :: Lens' GameState Player
 curPlayerL f s = playerAtL (playerIx s) f s
 
--- | View a 'GameMasterState' as a 'GameState' from the perspective of a player.
-toPlayerState :: PlayerIx -> GameMasterState -> GameState
-toPlayerState i state = GameState
-  { hand      = hand (curPlayer state)
-  , tableau   = tableau (curPlayer state)
-  , parade    = parade state
-  -- TODO: Cycle opponents list so next opponent is at the head
-  , opponents = deleteIx (playerIx state) (players state)
-  -- TODO: Cache deck length in GameMasterState
-  , deckSize  = length (deck state)
-  }
- where
-  deleteIx :: [a] -> Int -> [a]
-  deleteIx xs n | n < 0 = xs
-  deleteix [] _ = []
-  deleteIx (x:xs) 0 = xs
-  deleteix (_:xs) n = deleteIx xs (n-1)
-
--- | View a 'GameMasterState' as a 'GameState' from the perspective of the
--- current player.
-curPlayerState :: GameMasterState -> GameState
-curPlayerState state = toPlayerState (playerIx state) state
-
 -- | If a move is made, would it be the last?
-isLastMove :: GameMasterState -> Bool
+isLastMove :: GameState -> Bool
 isLastMove state = lastTurn state == Just (playerIx state)
 
 -- | Has the game already entered the final round?
-isFinalRound :: GameMasterState -> Bool
+isFinalRound :: GameState -> Bool
 isFinalRound = isJust . lastTurn
+
+
+-- | The game state from the perspective of a single player.
+data PlayerView = PlayerView
+  { hand      :: Hand
+  , tableau   :: Tableau
+  , parade    :: Parade
+  , opponents :: [Tableau] -- TODO: Include num cards in hand?
+  , deckSize  :: Int
+  } deriving (Eq, Ord, Show)
+makeLensesWith elSuffixFields ''PlayerView
+
+-- | View a 'GameState as a 'PlayerView from the perspective of a player.
+toPlayerView :: PlayerIx -> GameState -> PlayerView
+toPlayerView i state = PlayerView
+  { hand      = view (playerAtL i . handL) state
+  , tableau   = view (playerAtL i . tableauL) state
+  , parade    = view paradeL state
+  -- TODO: Cycle opponents list so next opponent is at the head
+  , opponents = deleteIx i (state ^.. playersL . each . tableauL)
+  -- TODO: Cache deck length in GameState
+  , deckSize  = length (deck state)
+  }
+ where
+  deleteIx :: Int -> [a] -> [a]
+  deleteIx n xs | n < 0 = xs
+  deleteIx _ [] = []
+  deleteIx 0 (_:xs) = xs
+  deleteIx n (_:xs) = deleteIx (n-1) xs
+
+-- | View a 'GameState as a 'PlayerView from the perspective of the
+-- current player.
+curPlayerView :: GameState -> PlayerView
+curPlayerView state = toPlayerView (playerIx state) state
 
 
 data StepResult
   = InvalidMove
   -- ^ The card being played was not in the current player's hand.
-  | Round GameMasterState
+  | Round GameState
   -- ^ The new round is not the final one.
-  | FinalRound GameMasterState
+  | FinalRound GameState
   -- ^ The new round is the final one.
-  | GameOver GameMasterState
+  | GameOver GameState
   -- ^ The game is over.
 
-stepParade :: Card -> GameMasterState -> StepResult
+stepParade :: Card -> GameState -> StepResult
 stepParade card state
   | not (elem card (state ^. curPlayerL . handL)) = InvalidMove
   | otherwise = stepParade' card state
 
 -- Precondition: play is valid.
-stepParade' :: Card -> GameMasterState -> StepResult
+stepParade' :: Card -> GameState -> StepResult
 stepParade' card state
   | isLastMove   state    = GameOver   newState
   | isFinalRound newState = FinalRound newState
   | otherwise             = Round      newState
  where
-  newState :: GameMasterState
+  newState :: GameState
   newState = state
     & playerIxL  %~ updatePlayerIx
     & curPlayerL %~ updateCurPlayer -- Updates playersL
@@ -179,7 +184,7 @@ stepParade' card state
       | otherwise = (c <| p, cs)
 
     -- Wow DuplicateRecordFields... fail.
-    parade' :: GameMasterState -> Parade
+    parade' :: GameState -> Parade
     parade' = parade
 
   updateDeck :: Deck -> Deck
