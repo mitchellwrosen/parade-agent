@@ -71,9 +71,35 @@ playerAtL n =
     (\s -> players s !! n)
     (\s p -> s & playersL . ix n .~ p)
 
+curPlayer :: GameMasterState -> Player
+curPlayer = view curPlayerL
+
 -- | Lens on the current player.
 curPlayerL :: Lens' GameMasterState Player
 curPlayerL f s = playerAtL (playerIx s) f s
+
+-- | View a 'GameMasterState' as a 'GameState' from the perspective of a player.
+toPlayerState :: PlayerIx -> GameMasterState -> GameState
+toPlayerState i state = GameState
+  { hand      = hand (curPlayer state)
+  , tableau   = tableau (curPlayer state)
+  , parade    = parade state
+  -- TODO: Cycle opponents list so next opponent is at the head
+  , opponents = deleteIx (playerIx state) (players state)
+  -- TODO: Cache deck length in GameMasterState
+  , deckSize  = length (deck state)
+  }
+ where
+  deleteIx :: [a] -> Int -> [a]
+  deleteIx xs n | n < 0 = xs
+  deleteix [] _ = []
+  deleteIx (x:xs) 0 = xs
+  deleteix (_:xs) n = deleteIx xs (n-1)
+
+-- | View a 'GameMasterState' as a 'GameState' from the perspective of the
+-- current player.
+curPlayerState :: GameMasterState -> GameState
+curPlayerState state = toPlayerState (playerIx state) state
 
 -- | If a move is made, would it be the last?
 isLastMove :: GameMasterState -> Bool
@@ -82,6 +108,7 @@ isLastMove state = lastTurn state == Just (playerIx state)
 -- | Has the game already entered the final round?
 isFinalRound :: GameMasterState -> Bool
 isFinalRound = isJust . lastTurn
+
 
 data StepResult
   = InvalidMove
