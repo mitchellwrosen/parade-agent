@@ -18,6 +18,9 @@ library
     , containers
     , free
     , microlens-platform
+    , MonadRandom
+    , mtl
+    , random-shuffle
     , template-haskell
     , unordered-containers
     , vector
@@ -42,6 +45,9 @@ test-suite doctest
     , containers
     , free
     , microlens-platform
+    , MonadRandom
+    , mtl
+    , random-shuffle
     , template-haskell
     , unordered-containers
     , vector
@@ -63,6 +69,9 @@ test-suite spec
     , containers
     , free
     , microlens-platform
+    , MonadRandom
+    , mtl
+    , random-shuffle
     , template-haskell
     , unordered-containers
     , vector

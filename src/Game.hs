@@ -6,6 +6,7 @@
 module Game
   ( -- * Parade game state
     GameState(..)
+  , initialGameState
   , PlayerView(..)
   , toPlayerView
   , curPlayerView
@@ -24,13 +25,18 @@ import Deck
 import LensTH
 import Tableau
 
+import Control.Monad
+import Control.Monad.Random (MonadRandom)
+import Control.Monad.State (State, runState)
 import Data.List (delete)
 import Data.Maybe (isJust)
 import Data.Monoid
 import Data.Sequence (Seq, (<|))
 import Data.Set (Set)
+import GHC.Exts (IsList(fromList))
 import Lens.Micro.Platform
 
+import qualified Control.Monad.State as State
 import qualified Data.Set as Set
 
 type Hand = [Card]
@@ -38,6 +44,8 @@ type Hand = [Card]
 type Parade = Seq Card
 
 type PlayerIx = Int
+
+type NumPlayers = Int
 
 data Player = Player
   { hand    :: Hand
@@ -48,7 +56,7 @@ makeLensesWith elSuffixFields ''Player
 data GameState = GameState
   { playerIx   :: PlayerIx
   , players    :: [Player]
-  , numPlayers :: !Int
+  , numPlayers :: !NumPlayers
   , parade     :: Parade
   , deck       :: Deck
   , lastTurn   :: Maybe PlayerIx
@@ -71,6 +79,36 @@ curPlayer = view curPlayerL
 -- | Lens on the current player.
 curPlayerL :: Lens' GameState Player
 curPlayerL f s = playerAtL (playerIx s) f s
+
+-- | Initialize a 'GameState' for the given number of players.
+initialGameState :: MonadRandom m => NumPlayers -> m GameState
+initialGameState n = do
+  d <- initialDeck
+
+  let hs :: [Hand]
+      p  :: Parade
+      d' :: Deck
+      ((hs, p), d') =
+        -- Draw a bunch of cards in a little state monad
+        flip runState d $ do
+          hs_ <- replicateM n drawHand
+          p_  <- drawParade
+          pure (hs_, p_)
+
+  pure (GameState
+    { playerIx   = 0
+    , players    = map (\h -> Player h mempty) hs
+    , numPlayers = n
+    , parade     = p
+    , deck       = d'
+    , lastTurn   = Nothing
+    })
+ where
+  drawHand :: State Deck Hand
+  drawHand = State.state (drawCards 5)
+
+  drawParade :: State Deck Parade
+  drawParade = fromList <$> State.state (drawCards 6)
 
 -- | If a move is made, would it be the last?
 isLastMove :: GameState -> Bool
@@ -156,15 +194,15 @@ stepParade' card state
     -- Delete the played card from the player's hand
     & handL %~ delete card
     -- Draw the top card of the deck (if any)
-    & handL %~ drawCard
+    & handL %~ updateHand
     -- Insert into the tableau all of the cards attracted from the parade
     & tableauL %~ insertAttractedCards
    where
-    drawCard :: Hand -> Hand
-    drawCard =
-      case deck state of
-        []    -> id
-        (c:_) -> (c:)
+    updateHand :: Hand -> Hand
+    updateHand =
+      case drawCard (deck state) of
+        (Nothing, _) -> id
+        (Just c,  _) -> (c:)
 
     -- Insert all of the attracted cards into the tableau.
     insertAttractedCards :: Tableau -> Tableau

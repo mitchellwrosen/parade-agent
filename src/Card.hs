@@ -16,7 +16,7 @@ data Color
   | Purple
   | Yellow
   | Black
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)
 
 -- | @c1 `attracts` c2@ returns 'True' if @c2@ if of the same color or
 -- equal-or-lesser rank as @c1@.

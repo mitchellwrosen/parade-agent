@@ -20,6 +20,9 @@ dependencies:
   - containers
   - free
   - microlens-platform
+  - MonadRandom
+  - mtl
+  - random-shuffle
   - template-haskell
   - unordered-containers
   - vector
