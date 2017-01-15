@@ -1,5 +1,4 @@
-{-# language DuplicateRecordFields #-}
-{-# language TemplateHaskell       #-}
+{-# language TemplateHaskell #-}
 
 -- | Parade game types and game logic.
 
@@ -18,6 +17,7 @@ module Game
   , RankSet
   , Tableau
   , Player(..)
+  , PlayerIx
   ) where
 
 import Card

@@ -6,6 +6,7 @@ ghc-options: -Wall
 default-extensions:
   - BangPatterns
   - DeriveFunctor
+  - DuplicateRecordFields
   - FlexibleInstances
   - FunctionalDependencies
   - LambdaCase
