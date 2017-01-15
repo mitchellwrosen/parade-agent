@@ -29,7 +29,7 @@ library
       Deck
       Game
       LensTH
-      Monad
+      Parade
       Tableau
   default-language: Haskell2010
 

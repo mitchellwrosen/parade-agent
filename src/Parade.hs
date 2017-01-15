@@ -54,7 +54,6 @@ data StepResultType
   = TyInvalidMove
   | TyRound
   | TyFinalRound
-  | TyGameOver
 
 runParade :: forall m a. MonadRandom m => [PlayerView -> Agent m a] -> m [a]
 runParade ps = do
@@ -90,33 +89,29 @@ runParade'
   -> Map PlayerIx (PlayResult -> Agent m a)
   -> m [a]
 runParade' state ty ps = do
-  let -- Piece together the PlayResult to send to the next player from the
-      -- result of the previous move. Return Nothing if the game's over.
-      maybePlayRes :: Maybe PlayResult
-      maybePlayRes =
-        case ty of
-          TyInvalidMove -> Just PlayInvalidMove
-          TyRound       -> Just (PlayRound      (curPlayerView state))
-          TyFinalRound  -> Just (PlayFinalRound (curPlayerView state))
-          TyGameOver    -> Nothing
-
-  case maybePlayRes of
-    Nothing -> runParadeGameOver state ps
-    Just playRes ->
-      runFreeT (curPlayer playRes) >>= \case
-        Pure _ -> error "Player logic ended early"
-        Free (Play card k') ->
-          case stepParade card state of
-            InvalidMove         -> runParade' state    TyInvalidMove newPlayers
-            Round      newState -> runParade' newState TyRound       newPlayers
-            FinalRound newState -> runParade' newState TyFinalRound  newPlayers
-            GameOver   newState -> runParade' newState TyGameOver    newPlayers
-         where
-          newPlayers :: Map PlayerIx (PlayResult -> Agent m a)
-          newPlayers = Map.insert (playerIx state) k' ps
+  runFreeT (curPlayer playRes) >>= \case
+    Pure _ -> error "Player logic ended early"
+    Free (Play card k') ->
+      case stepParade card state of
+        InvalidMove         -> runParade' state    TyInvalidMove newPlayers
+        Round      newState -> runParade' newState TyRound       newPlayers
+        FinalRound newState -> runParade' newState TyFinalRound  newPlayers
+        GameOver   newState -> runParadeGameOver newState newPlayers
+     where
+      newPlayers :: Map PlayerIx (PlayResult -> Agent m a)
+      newPlayers = Map.insert (playerIx state) k' ps
  where
   curPlayer :: PlayResult -> Agent m a
   curPlayer = ps ! playerIx state
+
+  -- Piece together the PlayResult to send to the next player from the
+  -- result of the previous move.
+  playRes :: PlayResult
+  playRes =
+    case ty of
+      TyInvalidMove -> PlayInvalidMove
+      TyRound       -> PlayRound      (curPlayerView state)
+      TyFinalRound  -> PlayFinalRound (curPlayerView state)
 
 -- | Send each player the 'GameOver' result, and expect their logic to end.
 runParadeGameOver
