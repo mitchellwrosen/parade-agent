@@ -5,16 +5,28 @@ ghc-options: -Wall
 
 default-extensions:
   - BangPatterns
+  - DeriveFunctor
+  - DuplicateRecordFields
+  - FlexibleInstances
+  - FunctionalDependencies
   - LambdaCase
+  - MultiParamTypeClasses
   - OverloadedStrings
+  - RankNTypes
+  - TypeSynonymInstances
   - ViewPatterns
 
 dependencies:
   - base
-  - vector
-  - unordered-containers
   - containers
   - free
+  - microlens-platform
+  - MonadRandom
+  - mtl
+  - random-shuffle
+  - template-haskell
+  - unordered-containers
+  - vector
 
 library:
   source-dirs: src

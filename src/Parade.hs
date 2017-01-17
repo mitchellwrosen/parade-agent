@@ -1,105 +1,139 @@
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE DeriveFunctor #-}
-module Parade where
 
+module Parade
+  ( -- * Agents
+    Agent
+  , Action
+  , play
+  , PlayResult(..)
+    -- * Agent runners
+  , runParade
+    -- * AIs
+  , playFirstCardAI
+  ) where
+
+import Card
+import Game
+
+import Control.Monad
+import Control.Monad.Random (MonadRandom)
 import Control.Monad.Trans.Free
-import Data.Map (Map)
+import Data.Map (Map, (!))
 
-data Card = Card Color Int
-  deriving (Eq, Ord, Show)
+import qualified Data.Map as Map
 
-data Color
-  = Red
-  | Green
-  | Blue
-  | Purple
-  | Yellow
-  | Black
-  deriving (Eq, Ord, Show)
 
-type Parade = [Card]
-type Deck = [Card]
-type Hand = [Card]
+type Agent = FreeT Action
 
-type Tableau = Map Color Int
-
-data GameMasterState =
-  GameMasterState Int [(Hand, Tableau)] Parade Deck
-  deriving (Eq, Ord, Show)
-
-data GameState =
-  GameState Hand Tableau [Tableau] Parade Int
-  deriving (Eq, Ord, Show)
-
-data PlayResult
-  = Round GameState
-  | FinalRound GameState
-  | GameOver Int [Int]
-
-data MasterPlayResult
-  = MasterRound GameMasterState
-  | MasterFinalRound GameMasterState
-  | MasterGameOver [Int]
-
+-- | The underlying player action functor.
 data Action x
   = Play Card (PlayResult -> x)
+  -- ^ Play a card.
   deriving (Functor)
 
-type Player m a = GameState -> FreeT Action m a
+-- | The result of making a play from the perspective of a single player.
+data PlayResult
+  = PlayInvalidMove
+  -- ^ The requested move was invalid.
+  | PlayRound PlayerView
+  -- ^ The round continued as normal.
+  | PlayFinalRound PlayerView
+  -- ^ Your or another player triggered the final round condition on or after
+  -- your previous move; the next (legal) move you make on the given game state
+  -- will be your last.
+  | PlayGameOver PlayerView
+  -- ^ The game is over.
 
-play :: Monad m => Card -> FreeT Action m PlayResult
+-- | Play smart constructor
+play :: Monad m => Card -> Agent m PlayResult
 play c = liftF (Play c id)
 
-dummyAI :: Monad m => Player m (Int, [Int])
-dummyAI (GameState (x:xs) _ _ _ _) = do
-  res <- play x
-  case res of
-    Round gs -> dummyAI gs
-    FinalRound gs -> dummyAI gs
-    GameOver i is -> return (i, is)
 
-toPlayerState :: GameMasterState -> GameState
-toPlayerState = undefined
+-- | The tag of the previous move's 'StepResult', to be sent to the next player.
+data StepResultType
+  = TyInvalidMove
+  | TyRound
+  | TyFinalRound
 
-runParade :: forall m a . Monad m => Player m a -> m [Int]
-runParade p = go start (p $ toPlayerState start)
-  where
-    start :: GameMasterState
-    start = GameMasterState 0 [(hand, mempty)]
-                 parade (replicate 50 (Card Red 4))
+runParade :: forall m a. MonadRandom m => [PlayerView -> Agent m a] -> m [a]
+runParade ps = do
+  state <- initialGameState (length ps)
 
-    hand :: [Card]
-    hand = replicate 5 (Card Red 4)
+  let ps' :: Map PlayerIx (PlayResult -> Agent m a)
+      ps' = Map.fromList (zip [0..] (map adjust ps))
 
-    parade :: [Card]
-    parade = replicate 6 (Card Red 4)
+  runParade' state TyRound ps'
+ where
+  -- | Adjust an "initial" player (expecting a 'PlayerView') to one that expects
+  -- the result of a play (that it hasn't made yet), which *must* be a 'Round'.
+  --
+  -- This should be a total function under normal circumstances, since it
+  -- shouldn't be possible for one's very first turn to be a 'FinalRound',
+  -- unless there are so many players in the game that the entire deck's been
+  -- exhausted.
+  --
+  -- It *definitely* shouldn't be possible to get an 'InvalidMove' or 'GameOver'
+  -- 'PlayResult' no matter how many players are in the game.
+  adjust :: (PlayerView -> Agent m a) -> (PlayResult -> Agent m a)
+  adjust k = \case
+    PlayRound state  -> k state
+    PlayInvalidMove  -> error "Unexpected PlayInvalidMove"
+    PlayFinalRound _ -> error "Unexpected PlayFinalRound"
+    PlayGameOver   _ -> error "Unexpected PlayGameOver"
 
-    go :: GameMasterState -> FreeT Action m a -> m [Int]
-    go gms@(GameMasterState cur hs p d) pl = do
-      res <- runFreeT pl
-      case res of
-        -- FIXME: this is where we can send error messages
-        Pure a -> error "shouldn't happen"
-        Free fb ->
-          case fb of
-            Play c k
-              | not (elem c h) -> go gms (k (Round gs))
-              | otherwise ->
-                case runPlay c of
-                  MasterRound gms'      ->
-                    go gms' (k $ Round (toPlayerState gms'))
-                  MasterFinalRound gms' ->
-                    go gms' (k $ FinalRound (toPlayerState gms'))
-                  MasterGameOver rs@(res:[]) -> do
-                    runFreeT (k (GameOver res []))
-                    pure rs
-      where
-        gs@(GameState h _ _ _ _) = toPlayerState gms
+runParade'
+  :: forall m a.
+     Monad m
+  => GameState
+  -> StepResultType
+  -> Map PlayerIx (PlayResult -> Agent m a)
+  -> m [a]
+runParade' state ty ps = do
+  runFreeT (curPlayer playRes) >>= \case
+    Pure _ -> error "Player logic ended early"
+    Free (Play card k') ->
+      case stepParade card state of
+        InvalidMove         -> runParade' state    TyInvalidMove newPlayers
+        Round      newState -> runParade' newState TyRound       newPlayers
+        FinalRound newState -> runParade' newState TyFinalRound  newPlayers
+        GameOver   newState -> runParadeGameOver newState newPlayers
+     where
+      newPlayers :: Map PlayerIx (PlayResult -> Agent m a)
+      newPlayers = Map.insert (playerIx state) k' ps
+ where
+  curPlayer :: PlayResult -> Agent m a
+  curPlayer = ps ! playerIx state
 
-        runPlay :: Card -> MasterPlayResult
-        runPlay = undefined
-          -- draw cards for the hand
-          -- add to parade
-          -- what from the old parade gets added to tableau
+  -- Piece together the PlayResult to send to the next player from the
+  -- result of the previous move.
+  playRes :: PlayResult
+  playRes =
+    case ty of
+      TyInvalidMove -> PlayInvalidMove
+      TyRound       -> PlayRound      (curPlayerView state)
+      TyFinalRound  -> PlayFinalRound (curPlayerView state)
 
+-- | Send each player the 'GameOver' result, and expect their logic to end.
+runParadeGameOver
+  :: Monad m => GameState -> Map PlayerIx (PlayResult -> Agent m a) -> m [a]
+runParadeGameOver state ps =
+  forM (Map.assocs ps) $ \(i, k) ->
+    runFreeT (k (PlayGameOver (toPlayerView i state))) >>= \case
+      Pure a -> pure a
+      Free _ -> error "Unexpected player logic"
+
+
+--------------------------------------------------------------------------------
+-- AIs
+
+playFirstCardAI :: Monad m => PlayerView -> Agent m PlayerView
+playFirstCardAI state = do
+  let (card:_) = hand' state
+  play card >>= \case
+    PlayInvalidMove         -> error "playFirstCardAI: InvalidMove"
+    PlayRound      newState -> playFirstCardAI newState
+    PlayFinalRound newState -> playFirstCardAI newState
+    PlayGameOver   newState -> pure newState
+ where
+  hand' :: PlayerView -> Hand
+  hand' = hand
