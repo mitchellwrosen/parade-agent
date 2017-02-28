@@ -5,31 +5,45 @@ ghc-options: -Wall
 
 default-extensions:
   - BangPatterns
+  - DeriveAnyClass
   - DeriveFunctor
+  - DeriveGeneric
   - DuplicateRecordFields
   - FlexibleInstances
   - FunctionalDependencies
+  - InstanceSigs
   - LambdaCase
   - MultiParamTypeClasses
   - OverloadedStrings
   - RankNTypes
+  - StandaloneDeriving
   - TypeSynonymInstances
   - ViewPatterns
 
-dependencies:
-  - base
-  - containers
-  - free
-  - microlens-platform
-  - MonadRandom
-  - mtl
-  - random-shuffle
-  - template-haskell
-  - unordered-containers
-  - vector
-
 library:
   source-dirs: src
+  dependencies:
+    - base
+    - containers
+    - elm-export
+    - free
+    - microlens-platform
+    - MonadRandom
+    - mtl
+    - random-shuffle
+    - template-haskell
+    - unordered-containers
+    - vector
+
+executables:
+  generate-elm-types:
+    source-dirs: app
+    main: GenerateElmTypes.hs
+    dependencies:
+      - base
+      - containers
+      - elm-export
+      - parade-agent
 
 tests:
   doctest:

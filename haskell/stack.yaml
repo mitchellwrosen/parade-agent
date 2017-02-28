@@ -1,0 +1,7 @@
+resolver: lts-7.15
+packages:
+  - .
+  - location:
+      git: git@github.com:FPtje/elm-export.git
+      commit: b85a694
+    extra-dep: true
