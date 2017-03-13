@@ -5,6 +5,12 @@
 module Game
   ( -- * Parade game state
     GameState(..)
+  , playerIxL
+  , playersL
+  , numPlayersL
+  , paradeL
+  , deckL
+  , lastTurnL
   , initialGameState
   , PlayerView(..)
   , toPlayerView
@@ -17,6 +23,8 @@ module Game
   , RankSet
   , Tableau
   , Player(..)
+  , handL
+  , tableauL
   , PlayerIx
   ) where
 
@@ -145,7 +153,7 @@ toPlayerView i state = PlayerView
   deleteIx n xs | n < 0 = xs
   deleteIx _ [] = []
   deleteIx 0 (_:xs) = xs
-  deleteIx n (_:xs) = deleteIx (n-1) xs
+  deleteIx n (x:xs) = x : deleteIx (n-1) xs
 
 -- | View a 'GameState as a 'PlayerView from the perspective of the
 -- current player.
