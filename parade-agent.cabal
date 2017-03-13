@@ -11,7 +11,7 @@ cabal-version:  >= 1.10
 library
   hs-source-dirs:
       src
-  default-extensions: BangPatterns DeriveFunctor DuplicateRecordFields FlexibleInstances FunctionalDependencies LambdaCase MultiParamTypeClasses OverloadedStrings RankNTypes TypeSynonymInstances ViewPatterns
+  default-extensions: BangPatterns DeriveFunctor DuplicateRecordFields FlexibleInstances FunctionalDependencies LambdaCase MultiParamTypeClasses MultiWayIf NamedFieldPuns OverloadedStrings RankNTypes TypeSynonymInstances ViewPatterns
   ghc-options: -Wall
   build-depends:
       base
@@ -38,7 +38,7 @@ test-suite doctest
   main-is: DocTest.hs
   hs-source-dirs:
       test
-  default-extensions: BangPatterns DeriveFunctor DuplicateRecordFields FlexibleInstances FunctionalDependencies LambdaCase MultiParamTypeClasses OverloadedStrings RankNTypes TypeSynonymInstances ViewPatterns
+  default-extensions: BangPatterns DeriveFunctor DuplicateRecordFields FlexibleInstances FunctionalDependencies LambdaCase MultiParamTypeClasses MultiWayIf NamedFieldPuns OverloadedStrings RankNTypes TypeSynonymInstances ViewPatterns
   ghc-options: -Wall
   build-depends:
       base
@@ -62,7 +62,7 @@ test-suite spec
   main-is: Spec.hs
   hs-source-dirs:
       test
-  default-extensions: BangPatterns DeriveFunctor DuplicateRecordFields FlexibleInstances FunctionalDependencies LambdaCase MultiParamTypeClasses OverloadedStrings RankNTypes TypeSynonymInstances ViewPatterns
+  default-extensions: BangPatterns DeriveFunctor DuplicateRecordFields FlexibleInstances FunctionalDependencies LambdaCase MultiParamTypeClasses MultiWayIf NamedFieldPuns OverloadedStrings RankNTypes TypeSynonymInstances ViewPatterns
   ghc-options: -Wall
   build-depends:
       base

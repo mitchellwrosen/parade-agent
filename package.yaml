@@ -11,6 +11,8 @@ default-extensions:
   - FunctionalDependencies
   - LambdaCase
   - MultiParamTypeClasses
+  - MultiWayIf
+  - NamedFieldPuns
   - OverloadedStrings
   - RankNTypes
   - TypeSynonymInstances

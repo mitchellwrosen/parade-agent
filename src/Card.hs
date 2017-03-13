@@ -18,6 +18,15 @@ data Color
   | Black
   deriving (Bounded, Enum, Eq, Ord, Show)
 
+allColors :: [Color]
+allColors = [minBound..maxBound]
+
+numColors :: Int
+numColors = 6
+
+numRanks :: Int
+numRanks = 10
+
 -- | @c1 `attracts` c2@ returns 'True' if @c2@ if of the same color or
 -- equal-or-lesser rank as @c1@.
 attracts :: Card -> Card -> Bool

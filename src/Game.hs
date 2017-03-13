@@ -15,6 +15,7 @@ module Game
   , PlayerView(..)
   , toPlayerView
   , curPlayerView
+  , playerViewFeatures
   , StepResult(..)
   , stepParade
     -- * Misc. types
@@ -41,11 +42,15 @@ import Data.Maybe (isJust)
 import Data.Monoid
 import Data.Sequence (Seq, (<|))
 import Data.Set (Set)
+import Data.Vector.Storable (Vector, (!))
 import GHC.Exts (IsList(fromList))
 import Lens.Micro.Platform
 
 import qualified Control.Monad.State as State
+import qualified Data.IntSet as IntSet
+import qualified Data.Map as Map
 import qualified Data.Set as Set
+import qualified Data.Vector.Storable as Vector
 
 type Hand = [Card]
 
@@ -160,6 +165,42 @@ toPlayerView i state = PlayerView
 curPlayerView :: GameState -> PlayerView
 curPlayerView state = toPlayerView (playerIx state) state
 
+playerViewFeatures :: NumPlayers -> PlayerView -> Vector Double
+playerViewFeatures n PlayerView{hand, parade, tableau, opponents, deckSize} =
+  Vector.generate
+      (1                    -- deck size
+        + 5                 -- my hand
+        + 20                -- first 20 parade cards
+        + 2 * numColors * n -- all tableaus, 2 doubles per 6 color
+       ) $ \i ->
+
+    if | i == 0 -> fromIntegral deckSize
+       | i < 6  -> maybe 0 cardValue (preview (ix (i-1)) hand)
+       | i < 26 -> maybe 0 cardValue (preview (ix (i-6)) parade)
+       | otherwise ->
+           let
+             (j,k) = (i - 26) `divMod` (2 * numColors)
+           in
+             (tableauValues ^?! ix j) ! k
+ where
+  cardValue :: Card -> Double
+  cardValue Card{color, rank} = fromIntegral (fromEnum color * numRanks + rank)
+
+  tableauValues :: [Vector Double] -- (numColors * 2) elements each
+  tableauValues = map mkTableauValue (tableau:opponents)
+
+  mkTableauValue :: Tableau -> Vector Double
+  mkTableauValue t =
+    fromList
+      (Map.elems
+        (appEndo (foldMap
+          (\color -> Endo (Map.insertWith (<>) color mempty)) allColors) t)
+            >>= f)
+   where
+    f :: RankSet -> [Double]
+    f ranks = [ fromIntegral (IntSet.size ranks)
+              , fromIntegral (IntSet.foldl' (+) 0 ranks)
+              ]
 
 data StepResult
   = InvalidMove
